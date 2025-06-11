@@ -4,9 +4,9 @@ import mihon.buildlogic.getCommitCount
 import mihon.buildlogic.getGitSha
 
 plugins {
-    id("mihon.android.application")
-    id("mihon.android.application.compose")
-    id("com.github.zellius.shortcut-helper")
+    id("mihon.library")
+    id("mihon.library.compose")
+    kotlin("multiplatform")
     kotlin("plugin.serialization")
     alias(libs.plugins.aboutLibraries)
 }
@@ -18,16 +18,13 @@ if (Config.includeTelemetry) {
     }
 }
 
-shortcutHelper.setFilePath("./shortcuts.xml")
-
 android {
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "app.mihon"
-
-        versionCode = 11
-        versionName = "0.18.0"
+        buildConfigField("String", "APPLICATION_ID", "\"com.mihon\"")
+        buildConfigField("String", "VERSION_NAME", "\"0.1\"")
+        buildConfigField("int", "VERSION_CODE", "1")
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
@@ -36,61 +33,6 @@ android {
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        val debug by getting {
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-${getCommitCount()}"
-            isPseudoLocalesEnabled = true
-        }
-        val release by getting {
-            isMinifyEnabled = Config.enableCodeShrink
-            isShrinkResources = Config.enableCodeShrink
-
-            proguardFiles("proguard-android-optimize.txt", "proguard-rules.pro")
-
-            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = true)}\"")
-        }
-
-        val commonMatchingFallbacks = listOf(release.name)
-
-        create("foss") {
-            initWith(release)
-
-            applicationIdSuffix = ".foss"
-
-            matchingFallbacks.addAll(commonMatchingFallbacks)
-        }
-        create("preview") {
-            initWith(release)
-
-            applicationIdSuffix = ".debug"
-
-            versionNameSuffix = debug.versionNameSuffix
-            signingConfig = debug.signingConfig
-
-            matchingFallbacks.addAll(commonMatchingFallbacks)
-
-            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = false)}\"")
-        }
-        create("benchmark") {
-            initWith(release)
-
-            isDebuggable = false
-            isProfileable = true
-            versionNameSuffix = "-benchmark"
-            applicationIdSuffix = ".benchmark"
-
-            signingConfig = debug.signingConfig
-
-            matchingFallbacks.addAll(commonMatchingFallbacks)
-        }
-    }
-
-    sourceSets {
-        getByName("preview").res.srcDirs("src/debug/res")
-        getByName("benchmark").res.srcDirs("src/debug/res")
     }
 
     splits {
@@ -130,11 +72,6 @@ android {
         }
     }
 
-    dependenciesInfo {
-        includeInApk = Config.includeDependencyInfo
-        includeInBundle = Config.includeDependencyInfo
-    }
-
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -152,6 +89,7 @@ android {
 }
 
 kotlin {
+    androidTarget()
     compilerOptions {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
