@@ -113,9 +113,7 @@ fun Application.routing(sourceManager: SourceManager) {
                     }
                 }.awaitAll()
 
-                val flattened = resultsMap.values.flatten().map { m -> m.url }.toList()
-
-                call.respond(flattened)
+                call.respond(resultsMap.toMap())
             } catch (e: Exception) {
                 Log.e("SOURCE_SERVICE", "Failed to query with error: ${e.message}\\n${e.stackTraceToString()} ")
             }
