@@ -56,5 +56,10 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.gson)
 
+    implementation(libs.injekt)
+
     implementation(project(":app"))
+    implementation(project(":core:common"))
+    implementation(project(":domain"))
+    implementation(project(":source-api"))
 }

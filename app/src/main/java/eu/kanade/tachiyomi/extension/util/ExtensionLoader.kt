@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.pm.PackageInfoCompat
 import eu.kanade.domain.extension.interactor.TrustExtension
 import eu.kanade.domain.source.service.SourcePreferences
@@ -128,34 +129,29 @@ internal object ExtensionLoader {
             .filter { isPackageAnExtension(it) }
             .map { ExtensionInfo(packageInfo = it, isShared = true) }
 
-        val privateExtPkgs = getPrivateExtensionDir(context)
-            .listFiles()
-            ?.asSequence()
-            ?.filter { it.isFile && it.extension == PRIVATE_EXTENSION_EXTENSION }
-            ?.mapNotNull {
-                // Just in case, since Android 14+ requires them to be read-only
-                if (it.canWrite()) {
-                    it.setReadOnly()
-                }
+        for (sharedExtPkg in sharedExtPkgs) {
+            Log.i("LOADER", "SHARED ${sharedExtPkg.packageInfo.packageName}")
+        }
 
-                val path = it.absolutePath
-                pkgManager.getPackageArchiveInfo(path, PACKAGE_FLAGS)
-                    ?.apply { applicationInfo!!.fixBasePaths(path) }
-            }
-            ?.filter { isPackageAnExtension(it) }
-            ?.map { ExtensionInfo(packageInfo = it, isShared = false) }
-            ?: emptySequence()
+//        val privateExtPkgs = getPrivateExtensionDir(context)
+//            .listFiles()
+//            ?.asSequence()
+//            ?.filter { it.isFile && it.extension == PRIVATE_EXTENSION_EXTENSION }
+//            ?.mapNotNull {
+//                // Just in case, since Android 14+ requires them to be read-only
+//                if (it.canWrite()) {
+//                    it.setReadOnly()
+//                }
+//
+//                val path = it.absolutePath
+//                pkgManager.getPackageArchiveInfo(path, PACKAGE_FLAGS)
+//                    ?.apply { applicationInfo!!.fixBasePaths(path) }
+//            }
+//            ?.filter { isPackageAnExtension(it) }
+//            ?.map { ExtensionInfo(packageInfo = it, isShared = false) }
+//            ?: emptySequence()
 
-        val extPkgs = (sharedExtPkgs + privateExtPkgs)
-            // Remove duplicates. Shared takes priority than private by default
-            .distinctBy { it.packageInfo.packageName }
-            // Compare version number
-            .mapNotNull { sharedPkg ->
-                val privatePkg = privateExtPkgs
-                    .singleOrNull { it.packageInfo.packageName == sharedPkg.packageInfo.packageName }
-                selectExtensionPackage(sharedPkg, privatePkg)
-            }
-            .toList()
+        val extPkgs = (sharedExtPkgs) .toList()
 
         if (extPkgs.isEmpty()) return emptyList()
 
@@ -252,24 +248,24 @@ internal object ExtensionLoader {
         if (signatures.isNullOrEmpty()) {
             logcat(LogPriority.WARN) { "Package $pkgName isn't signed" }
             return LoadResult.Error
-        } else if (!trustExtension.isTrusted(pkgInfo, signatures)) {
-            val extension = Extension.Untrusted(
-                extName,
-                pkgName,
-                versionName,
-                versionCode,
-                libVersion,
-                signatures.last(),
-            )
-            logcat(LogPriority.WARN) { "Extension $pkgName isn't trusted" }
-            return LoadResult.Untrusted(extension)
+//        } else if (!trustExtension.isTrusted(pkgInfo, signatures)) {
+//            val extension = Extension.Untrusted(
+//                extName,
+//                pkgName,
+//                versionName,
+//                versionCode,
+//                libVersion,
+//                signatures.last(),
+//            )
+//            logcat(LogPriority.WARN) { "Extension $pkgName isn't trusted" }
+//            return LoadResult.Untrusted(extension)
         }
 
         val isNsfw = appInfo.metaData.getInt(METADATA_NSFW) == 1
-        if (!loadNsfwSource && isNsfw) {
-            logcat(LogPriority.WARN) { "NSFW extension $pkgName not allowed" }
-            return LoadResult.Error
-        }
+//        if (!loadNsfwSource && isNsfw) {
+//            logcat(LogPriority.WARN) { "NSFW extension $pkgName not allowed" }
+//            return LoadResult.Error
+//        }
 
         val classLoader = try {
             ChildFirstPathClassLoader(appInfo.sourceDir, null, context.classLoader)

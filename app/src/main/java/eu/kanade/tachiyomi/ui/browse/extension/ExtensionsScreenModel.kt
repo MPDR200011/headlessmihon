@@ -204,7 +204,7 @@ class ExtensionsScreenModel(
 
     fun trustExtension(extension: Extension.Untrusted) {
         screenModelScope.launch {
-            extensionManager.trust(extension)
+//            extensionManager.trust(extension)
         }
     }
 

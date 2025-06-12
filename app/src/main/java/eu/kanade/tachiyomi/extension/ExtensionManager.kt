@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.util.Log
 import eu.kanade.domain.extension.interactor.TrustExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.api.ExtensionApi
@@ -42,7 +43,6 @@ import java.util.Locale
 class ExtensionManager(
     private val context: Context,
     private val preferences: SourcePreferences = Injekt.get(),
-    private val trustExtension: TrustExtension = Injekt.get(),
 ) {
 
     val scope = CoroutineScope(SupervisorJob())
@@ -267,24 +267,6 @@ class ExtensionManager(
      */
     fun uninstallExtension(extension: Extension) {
         installer.uninstallApk(extension.pkgName)
-    }
-
-    /**
-     * Adds the given extension to the list of trusted extensions. It also loads in background the
-     * now trusted extensions.
-     *
-     * @param extension the extension to trust
-     */
-    suspend fun trust(extension: Extension.Untrusted) {
-        untrustedExtensionMapFlow.value[extension.pkgName] ?: return
-
-        trustExtension.trust(extension.pkgName, extension.versionCode, extension.signatureHash)
-
-        untrustedExtensionMapFlow.value -= extension.pkgName
-
-        ExtensionLoader.loadExtensionFromPkgName(context, extension.pkgName)
-            .let { it as? LoadResult.Success }
-            ?.let { registerNewExtension(it.extension) }
     }
 
     /**
