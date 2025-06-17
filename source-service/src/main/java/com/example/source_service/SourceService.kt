@@ -18,7 +18,11 @@ import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.source.AndroidSourceManager
+import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.system.isDebugBuildType
+import io.ktor.http.ContentType
+import io.ktor.http.HeaderValueParam
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.Application
@@ -30,6 +34,7 @@ import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -144,28 +149,55 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/chapter/pages") {
-            try {
-                val chapterToFetch = call.receive<Chapter>()
-                val sourceId = call.request.queryParameters["sourceId"]?.toLong()
+            val chapterToFetch = call.receive<Chapter>()
+            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
 
-                if (sourceId == null) {
-                    call.response.status(HttpStatusCode(400, "Missing sourceId"))
-                    return@get
-                }
-
-                val source = sourceManager.get(sourceId)
-                if (source == null) {
-                    call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
-                    return@get
-                }
-
-                val pageList = source.getPageList(chapterToFetch.toSChapter())
-
-                call.respond(pageList)
+            if (sourceId == null) {
+                call.response.status(HttpStatusCode(400, "Missing sourceId"))
                 return@get
+            }
+
+            val source = sourceManager.get(sourceId)
+            if (source == null) {
+                call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                return@get
+            }
+
+            // FIXME create proper Page serializer
+            val pageList = source.getPageList(chapterToFetch.toSChapter())
+
+            call.respond(pageList)
+            return@get
+        }
+
+        get("/manga/chapter/page/image") {
+            val page: Page
+            try {
+                page = call.receive<Page>()
             } catch (e: Exception) {
-                Log.e("ERROR", "$e")
+                Log.e("IMAGE", "$e: ${e.stackTraceToString()}")
                 throw e
+            }
+            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
+
+            if (sourceId == null) {
+                call.response.status(HttpStatusCode(400, "Missing sourceId"))
+                return@get
+            }
+
+            val source = sourceManager.get(sourceId)
+            if (source == null) {
+                call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                return@get
+            }
+
+            if (source is HttpSource) {
+                val response = source.getImage(page)
+                val bodyContentType = response.body.contentType()!!
+                call.respondBytes(contentType = ContentType(bodyContentType.type, bodyContentType.subtype)) {
+                    response.body.bytes()
+                }
+                return@get
             }
         }
     }
