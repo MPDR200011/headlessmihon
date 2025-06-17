@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.google.gson.LongSerializationPolicy
+import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.domain.manga.model.toSManga
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
@@ -40,6 +41,7 @@ import kotlinx.coroutines.withContext
 import mihon.domain.manga.model.toDomainManga
 import tachiyomi.core.common.preference.AndroidPreferenceStore
 import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.domain.source.repository.StubSourceRepository
@@ -139,6 +141,32 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
             val chapterList = source.getChapterList(mangaToFetch.toSManga())
 
             call.respond(chapterList)
+        }
+
+        get("/manga/chapter/pages") {
+            try {
+                val chapterToFetch = call.receive<Chapter>()
+                val sourceId = call.request.queryParameters["sourceId"]?.toLong()
+
+                if (sourceId == null) {
+                    call.response.status(HttpStatusCode(400, "Missing sourceId"))
+                    return@get
+                }
+
+                val source = sourceManager.get(sourceId)
+                if (source == null) {
+                    call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                    return@get
+                }
+
+                val pageList = source.getPageList(chapterToFetch.toSChapter())
+
+                call.respond(pageList)
+                return@get
+            } catch (e: Exception) {
+                Log.e("ERROR", "$e")
+                throw e
+            }
         }
     }
 }
