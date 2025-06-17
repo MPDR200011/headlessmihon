@@ -125,6 +125,21 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
 
             call.respond(mangaDetails)
         }
+
+        get("/manga/chapters") {
+            val mangaToFetch = call.receive<Manga>()
+            val sourceId = mangaToFetch.source
+
+            val source = sourceManager.get(sourceId)
+            if (source == null) {
+                call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                return@get
+            }
+
+            val chapterList = source.getChapterList(mangaToFetch.toSManga())
+
+            call.respond(chapterList)
+        }
     }
 }
 
