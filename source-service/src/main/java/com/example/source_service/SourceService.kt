@@ -11,7 +11,9 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.google.gson.LongSerializationPolicy
-import eu.kanade.domain.chapter.model.toSChapter
+import com.google.gson.TypeAdapter
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonWriter
 import eu.kanade.domain.manga.model.toSManga
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
@@ -19,10 +21,10 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.source.AndroidSourceManager
 import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.source.model.SChapterImpl
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.system.isDebugBuildType
 import io.ktor.http.ContentType
-import io.ktor.http.HeaderValueParam
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.Application
@@ -46,7 +48,6 @@ import kotlinx.coroutines.withContext
 import mihon.domain.manga.model.toDomainManga
 import tachiyomi.core.common.preference.AndroidPreferenceStore
 import tachiyomi.core.common.preference.PreferenceStore
-import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.domain.source.repository.StubSourceRepository
@@ -149,7 +150,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/chapter/pages") {
-            val chapterToFetch = call.receive<Chapter>()
+            val chapterToFetch = call.receive<SChapterImpl>()
             val sourceId = call.request.queryParameters["sourceId"]?.toLong()
 
             if (sourceId == null) {
@@ -163,8 +164,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 return@get
             }
 
-            // FIXME create proper Page serializer
-            val pageList = source.getPageList(chapterToFetch.toSChapter())
+            val pageList = source.getPageList(chapterToFetch)
 
             call.respond(pageList)
             return@get
@@ -220,6 +220,52 @@ class ServiceModule(private val app: android.app.Application, private val contex
     }
 }
 
+class PageAdapter : TypeAdapter<Page>() {
+    override fun write(writer: JsonWriter?, value: Page?) {
+        writer!!
+
+        if (value == null) {
+            writer.nullValue()
+            return
+        }
+
+        writer.beginObject()
+        writer.name("index")
+        writer.value(value.index)
+        writer.name("url")
+        writer.value(value.url)
+        writer.name("imageUrl")
+        writer.value(value.imageUrl)
+        writer.endObject()
+    }
+
+    override fun read(reader: JsonReader?): Page {
+        reader!!
+        var index: Int = 0
+        var url: String = ""
+        var imageUrl: String? = null
+
+        reader.beginObject()
+        while (reader.hasNext()) {
+            val fieldName = reader.nextName()
+
+            when (fieldName) {
+                "index" -> index = reader.nextInt()
+                "url" -> url = reader.nextString()
+                "imageUrl" -> imageUrl = reader.nextString()
+            }
+        }
+        reader.endObject()
+
+        return Page(
+            index = index,
+            url = url,
+            imageUrl = imageUrl,
+        )
+    }
+
+}
+
 class SourceService : Service() {
     private val CHANNEL_ID = "HTTP_SERVER"
 
@@ -247,6 +293,8 @@ class SourceService : Service() {
                     // Needs to be parsed to string because JSON can't handle all Long values and truncates some
                     // e.g: in memory 2499283573021220255 => 2499283573021220400 in JSON
                     setLongSerializationPolicy(LongSerializationPolicy.STRING)
+
+                    registerTypeAdapter(Page::class.java, PageAdapter())
                 }
             }
 
