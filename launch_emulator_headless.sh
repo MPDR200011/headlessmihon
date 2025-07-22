@@ -97,12 +97,13 @@ function hidden_policy() {
 };
 
 function install_service_apk () {
+  adb shell "settings put secure install_non_market_apps 1"
   adb install $APK_LOCATION
 }
 
 function start_service() {
   adb forward tcp:8081 tcp:8080
-  adb shell am start-foreground-service com.example.headlessmihon/.HelloService
+  adb shell am start-foreground-service com.example.source_service/.SourceService
 }
 
 launch_emulator
