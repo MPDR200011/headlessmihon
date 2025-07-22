@@ -10,6 +10,7 @@ WORKDIR /
 #=============================
 SHELL ["/bin/bash", "-c"]
 
+# Utils for the emulator
 RUN apt update && apt install -y curl sudo wget unzip bzip2 libdrm-dev libxkbcommon-dev libgbm-dev libasound-dev libnss3 libxcursor1 libpulse-dev libxshmfence-dev xauth xvfb x11vnc fluxbox wmctrl libdbus-glib-1-2
 
 #==============================
@@ -56,24 +57,43 @@ ARG EMULATOR_NAME="service-runner"
 ENV EMULATOR_NAME=$EMULATOR_NAME
 RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}" --package "${EMULATOR_PACKAGE}"
 
+#################
+### APP SETUP ###
+#################
+
+# Utils for the application
+RUN apt install -y python3 python3-pip
+RUN pip install requests
+
+ARG RUNTIME_ROOT="/run"
+ENV RUNTIME_ROOT=$RUNTIME_ROOT
+ARG UTILS_DIR="${RUNTIME_ROOT}/utils/"
+
 #===================
 # Ports
 #===================
 EXPOSE 8081 8080/tcp
 
-#=========================
-# Copying Scripts to root
-#=========================
-ARG RUNTIME_ROOT="/run"
-COPY ./launch_emulator_headless.sh $RUNTIME_ROOT/launch_emulator_headless.sh
+#===================
+# Download extension APKs
+#===================
+COPY ./download_extensions.py $UTILS_DIR/download_extensions.py
+RUN chmod a+x $UTILS_DIR/download_extensions.py
+RUN $UTILS_DIR/download_extensions.py
 
-# Copy APK to location
-ARG APK_LOCATION="${RUNTIME_ROOT}/artifacts/source-service.apk"
-COPY ./source-service/build/outputs/apk/debug/source-service-debug.apk $APK_LOCATION
+#=========================
+# Copy service APK
+#=========================
+ARG APK_LOCATION="${RUNTIME_ROOT}/main_apk/source-service.apk"
 ENV APK_LOCATION=$APK_LOCATION
+COPY ./source-service/build/outputs/apk/debug/source-service-debug.apk $APK_LOCATION
 
-RUN ls -la /run/
-RUN chmod a+x /run/launch_emulator_headless.sh
+#=========================
+# Copy launch script
+#=========================
+COPY ./launch_emulator_headless.sh $RUNTIME_ROOT/launch_emulator_headless.sh
+RUN chmod a+x $RUNTIME_ROOT/launch_emulator_headless.sh
+
 
 #=======================
 # framework entry point
