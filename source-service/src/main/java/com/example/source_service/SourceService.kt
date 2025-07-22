@@ -85,7 +85,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 val query = call.request.queryParameters["q"]
                 val language = call.request.queryParameters["l"] ?: "en"
                 if (query == null) {
-                    call.respond<List<Unit>>(listOf())
+                    call.respond<Map<Long, List<Manga>>>(mapOf())
                     return@get
                 }
 
