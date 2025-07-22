@@ -59,7 +59,7 @@ RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}
 #===================
 # Ports
 #===================
-EXPOSE 8081 8081/tcp
+EXPOSE 8081 8080/tcp
 
 #=========================
 # Copying Scripts to root
@@ -69,7 +69,7 @@ COPY ./launch_emulator_headless.sh $RUNTIME_ROOT/launch_emulator_headless.sh
 
 # Copy APK to location
 ARG APK_LOCATION="${RUNTIME_ROOT}/artifacts/source-service.apk"
-COPY ./source-service/build/outputs/apk/release/source-service-release-unsigned.apk $APK_LOCATION
+COPY ./source-service/build/outputs/apk/debug/source-service-debug.apk $APK_LOCATION
 ENV APK_LOCATION=$APK_LOCATION
 
 RUN ls -la /run/

@@ -102,7 +102,7 @@ function install_service_apk () {
 }
 
 function start_service() {
-  adb forward tcp:8081 tcp:8080
+  adb forward tcp:8080 tcp:8080
   adb shell am start-foreground-service com.example.source_service/.SourceService
 }
 
@@ -117,3 +117,5 @@ sleep 1
 
 install_service_apk
 start_service
+
+bash
