@@ -63,7 +63,7 @@ RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}
 
 # Utils for the application
 RUN apt install -y python3 python3-pip
-RUN pip install requests
+RUN pip install requests simple-proxy
 
 ARG RUNTIME_ROOT="/run"
 ENV RUNTIME_ROOT=$RUNTIME_ROOT
@@ -72,7 +72,7 @@ ARG UTILS_DIR="${RUNTIME_ROOT}/utils/"
 #===================
 # Ports
 #===================
-EXPOSE 8081 8080/tcp
+EXPOSE 8081 8081/tcp
 
 #===================
 # Download extension APKs

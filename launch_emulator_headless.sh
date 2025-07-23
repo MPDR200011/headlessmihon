@@ -105,8 +105,12 @@ function install_service_apk () {
 }
 
 function start_service() {
-  adb forward tcp:8080 tcp:8080
+  adb forward tcp:9000 tcp:8080
   adb shell am start-foreground-service com.example.source_service/.SourceService
+
+  # This is needed as exposing the docker port + adb forward doesn't appear to
+  # be transitive
+  simple-proxy -lp 8081 -rp 9000 -g
 }
 
 launch_emulator
@@ -120,5 +124,3 @@ sleep 1
 
 install_service_apk
 start_service
-
-bash
