@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import com.google.errorprone.annotations.Immutable
 import com.google.gson.LongSerializationPolicy
 import com.google.gson.TypeAdapter
 import com.google.gson.stream.JsonReader
@@ -22,6 +23,8 @@ import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.source.AndroidSourceManager
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapterImpl
+import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.model.SMangaImpl
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.system.isDebugBuildType
 import io.ktor.http.ContentType
@@ -34,6 +37,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.request.ContentTransformationException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -57,6 +61,7 @@ import uy.kohesive.injekt.api.InjektRegistrar
 import uy.kohesive.injekt.api.addSingleton
 import uy.kohesive.injekt.api.addSingletonFactory
 import uy.kohesive.injekt.api.get
+import java.io.Serializable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -76,6 +81,9 @@ class NoopSourceRepository : StubSourceRepository {
     }
 }
 
+@Immutable
+data class SourceManga(val source: Long, val manga: SMangaImpl) : Serializable;
+
 fun Application.routing(sourceManager: AndroidSourceManager) {
     val coroutineDispatcher = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
 
@@ -91,7 +99,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
 
                 val sources = sourceManager.getCatalogueSources().filter { it.lang == language }
 
-                val resultsMap = ConcurrentHashMap<Long, List<Manga>>()
+                val resultsMap = ConcurrentHashMap<Long, List<SManga>>()
                 sources.map { source ->
                     async {
                         try {
@@ -100,7 +108,6 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                             }
 
                             val titles = page.mangas
-                                .map { it.toDomainManga(source.id) }
                                 .distinctBy { it.url }
 
                             resultsMap.set(source.id, titles)
@@ -120,7 +127,15 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/details") {
-            val mangaToFetch = call.receive<Manga>()
+
+            val mangaToFetch: SourceManga;
+            try {
+                mangaToFetch = call.receive<SourceManga>()
+            } catch (e: ContentTransformationException) {
+                Log.i("SOURCE_SERVICE", "${e}");
+                call.respond(HttpStatusCode.BadRequest)
+                return@get
+            }
             val sourceId = mangaToFetch.source
 
             val source = sourceManager.get(sourceId)
@@ -129,13 +144,13 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 return@get
             }
 
-            val mangaDetails = source.getMangaDetails(mangaToFetch.toSManga())
+            val mangaDetails = source.getMangaDetails(mangaToFetch.manga)
 
             call.respond(mangaDetails)
         }
 
         get("/manga/chapters") {
-            val mangaToFetch = call.receive<Manga>()
+            val mangaToFetch = call.receive<SourceManga>()
             val sourceId = mangaToFetch.source
 
             val source = sourceManager.get(sourceId)
@@ -144,7 +159,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 return@get
             }
 
-            val chapterList = source.getChapterList(mangaToFetch.toSManga())
+            val chapterList = source.getChapterList(mangaToFetch.manga)
 
             call.respond(chapterList)
         }

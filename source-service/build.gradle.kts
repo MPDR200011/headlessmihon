@@ -63,4 +63,5 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":domain"))
     implementation(project(":source-api"))
+    testImplementation(kotlin("test"))
 }
