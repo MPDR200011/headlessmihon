@@ -36,6 +36,7 @@ android {
     packaging {
         resources {
             excludes.add("META-INF/INDEX.LIST")
+            excludes.add("META-INF/DEPENDENCIES")
             excludes.add("META-INF/io.netty.versions.properties")
         }
     }
@@ -53,9 +54,13 @@ dependencies {
 //    androidTestImplementation(libs.espresso.core)
 
     implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.call.logging)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.gson)
+
+    implementation(libs.log4j.core)
+    implementation(libs.slf4j.impl)
 
     implementation(libs.injekt)
 

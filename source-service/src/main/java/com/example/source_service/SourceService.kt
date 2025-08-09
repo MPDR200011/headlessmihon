@@ -4,37 +4,33 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import com.example.source_service.di.ServiceModule
+import com.example.source_service.gson.PageAdapter
 import com.google.errorprone.annotations.Immutable
 import com.google.gson.LongSerializationPolicy
-import com.google.gson.TypeAdapter
-import com.google.gson.stream.JsonReader
-import com.google.gson.stream.JsonWriter
-import eu.kanade.domain.manga.model.toSManga
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
-import eu.kanade.tachiyomi.network.NetworkHelper
-import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.source.AndroidSourceManager
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapterImpl
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaImpl
 import eu.kanade.tachiyomi.source.online.HttpSource
-import eu.kanade.tachiyomi.util.system.isDebugBuildType
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.ContentTransformationException
@@ -49,18 +45,12 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import mihon.domain.manga.model.toDomainManga
+import org.slf4j.event.Level
 import tachiyomi.core.common.preference.AndroidPreferenceStore
-import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.domain.source.repository.StubSourceRepository
 import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.InjektModule
-import uy.kohesive.injekt.api.InjektRegistrar
-import uy.kohesive.injekt.api.addSingleton
-import uy.kohesive.injekt.api.addSingletonFactory
-import uy.kohesive.injekt.api.get
 import java.io.Serializable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -80,6 +70,8 @@ class NoopSourceRepository : StubSourceRepository {
         return
     }
 }
+
+val LOG_TAG = "SOURCE_SERVICE"
 
 @Immutable
 data class SourceManga(val source: Long, val manga: SMangaImpl) : Serializable;
@@ -122,7 +114,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
 
                 call.respond(resultsMap.toMap())
             } catch (e: Exception) {
-                Log.e("SOURCE_SERVICE", "Failed to query with error: ${e.message}\\n${e.stackTraceToString()} ")
+                Log.e(LOG_TAG, "Failed to query with error: ${e.message}\\n${e.stackTraceToString()} ")
             }
         }
 
@@ -132,7 +124,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
             try {
                 mangaToFetch = call.receive<SourceManga>()
             } catch (e: ContentTransformationException) {
-                Log.i("SOURCE_SERVICE", "${e}");
+                Log.i(LOG_TAG, "${e}");
                 call.respond(HttpStatusCode.BadRequest)
                 return@get
             }
@@ -165,24 +157,30 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/chapter/pages") {
-            val chapterToFetch = call.receive<SChapterImpl>()
-            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
+            call.application.environment.log.info("Received request for pages")
+            Log.i(LOG_TAG, "Received request for pages")
+            try {
+                val chapterToFetch = call.receive<SChapterImpl>()
+                val sourceId = call.request.queryParameters["sourceId"]?.toLong()
 
-            if (sourceId == null) {
-                call.response.status(HttpStatusCode(400, "Missing sourceId"))
+                if (sourceId == null) {
+                    call.response.status(HttpStatusCode(400, "Missing sourceId"))
+                    return@get
+                }
+
+                val source = sourceManager.get(sourceId)
+                if (source == null) {
+                    call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                    return@get
+                }
+
+                val pageList = source.getPageList(chapterToFetch)
+
+                call.respond(pageList)
                 return@get
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "$e: ${e.printStackTrace()}")
             }
-
-            val source = sourceManager.get(sourceId)
-            if (source == null) {
-                call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
-                return@get
-            }
-
-            val pageList = source.getPageList(chapterToFetch)
-
-            call.respond(pageList)
-            return@get
         }
 
         get("/manga/chapter/page/image") {
@@ -190,7 +188,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
             try {
                 page = call.receive<Page>()
             } catch (e: Exception) {
-                Log.e("IMAGE", "$e: ${e.stackTraceToString()}")
+                Log.e("LOG_TAG", "$e: ${e.stackTraceToString()}")
                 throw e
             }
             val sourceId = call.request.queryParameters["sourceId"]?.toLong()
@@ -218,69 +216,6 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
     }
 }
 
-class ServiceModule(private val app: android.app.Application, private val context: Context) : InjektModule {
-
-    override fun InjektRegistrar.registerInjectables() {
-        addSingleton(app)
-        addSingletonFactory<PreferenceStore> {
-            AndroidPreferenceStore(context)
-        }
-        addSingletonFactory {
-            NetworkPreferences(
-                preferenceStore = get(),
-                verboseLogging = isDebugBuildType,
-            )
-        }
-        addSingletonFactory { NetworkHelper(context, get()) }
-    }
-}
-
-class PageAdapter : TypeAdapter<Page>() {
-    override fun write(writer: JsonWriter?, value: Page?) {
-        writer!!
-
-        if (value == null) {
-            writer.nullValue()
-            return
-        }
-
-        writer.beginObject()
-        writer.name("index")
-        writer.value(value.index)
-        writer.name("url")
-        writer.value(value.url)
-        writer.name("imageUrl")
-        writer.value(value.imageUrl)
-        writer.endObject()
-    }
-
-    override fun read(reader: JsonReader?): Page {
-        reader!!
-        var index: Int = 0
-        var url: String = ""
-        var imageUrl: String? = null
-
-        reader.beginObject()
-        while (reader.hasNext()) {
-            val fieldName = reader.nextName()
-
-            when (fieldName) {
-                "index" -> index = reader.nextInt()
-                "url" -> url = reader.nextString()
-                "imageUrl" -> imageUrl = reader.nextString()
-            }
-        }
-        reader.endObject()
-
-        return Page(
-            index = index,
-            url = url,
-            imageUrl = imageUrl,
-        )
-    }
-
-}
-
 class SourceService : Service() {
     private val CHANNEL_ID = "HTTP_SERVER"
 
@@ -301,7 +236,6 @@ class SourceService : Service() {
             sourceRepository = NoopSourceRepository(),
         )
 
-        Log.i("SOURCE_SERVICE", "Creating")
         server = embeddedServer(Netty, port = 8080) {
             install(ContentNegotiation) {
                 gson {
@@ -311,6 +245,9 @@ class SourceService : Service() {
 
                     registerTypeAdapter(Page::class.java, PageAdapter())
                 }
+            }
+            install(CallLogging) {
+                level = Level.INFO
             }
 
             routing(sourceManager)
@@ -330,7 +267,7 @@ class SourceService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i("SOURCE_SERVICE", "Starting")
+        Log.i(LOG_TAG, "Starting")
 
         createNotificationChannel()
 
@@ -341,7 +278,7 @@ class SourceService : Service() {
     }
 
     override fun onDestroy() {
-        Log.i("SOURCE_SERVICE", "Destroying")
+        Log.i(LOG_TAG, "Destroying")
         server.stop(0, 0)
     }
 

@@ -110,7 +110,9 @@ function start_service() {
 
   # This is needed as exposing the docker port + adb forward doesn't appear to
   # be transitive
-  simple-proxy -lp 8081 -rp 9000 -g
+  simple-proxy -lp 8081 -rp 9000 -g &
+
+  adb logcat -s SOURCE_SERVICE:I
 }
 
 launch_emulator
