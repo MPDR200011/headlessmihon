@@ -26,7 +26,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.application.log
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -75,6 +74,12 @@ val LOG_TAG = "SOURCE_SERVICE"
 
 @Immutable
 data class SourceManga(val source: Long, val manga: SMangaImpl) : Serializable;
+
+@Immutable
+data class SourceChapter(val source: Long, val chapter: SChapterImpl) : Serializable;
+
+@Immutable
+data class SourcePage(val source: Long, val page: Page) : Serializable;
 
 fun Application.routing(sourceManager: AndroidSourceManager) {
     val coroutineDispatcher = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
@@ -157,13 +162,8 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/chapter/pages") {
-            val chapterToFetch = call.receive<SChapterImpl>()
-            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
-
-            if (sourceId == null) {
-                call.response.status(HttpStatusCode(400, "Missing sourceId"))
-                return@get
-            }
+            val chapterToFetch = call.receive<SourceChapter>()
+            val sourceId = chapterToFetch.source
 
             val source = sourceManager.get(sourceId)
             if (source == null) {
@@ -171,26 +171,21 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 return@get
             }
 
-            val pageList = source.getPageList(chapterToFetch)
+            val pageList = source.getPageList(chapterToFetch.chapter)
 
             call.respond(pageList)
             return@get
         }
 
         get("/manga/chapter/page/image") {
-            val page: Page
+            val page: SourcePage
             try {
-                page = call.receive<Page>()
+                page = call.receive<SourcePage>()
             } catch (e: Exception) {
                 Log.e("LOG_TAG", "$e: ${e.stackTraceToString()}")
                 throw e
             }
-            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
-
-            if (sourceId == null) {
-                call.response.status(HttpStatusCode(400, "Missing sourceId"))
-                return@get
-            }
+            val sourceId = page.source
 
             val source = sourceManager.get(sourceId)
             if (source == null) {
@@ -199,7 +194,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
             }
 
             if (source is HttpSource) {
-                val response = source.getImage(page)
+                val response = source.getImage(page.page)
                 val bodyContentType = response.body.contentType()!!
                 call.respondBytes(contentType = ContentType(bodyContentType.type, bodyContentType.subtype)) {
                     response.body.bytes()
