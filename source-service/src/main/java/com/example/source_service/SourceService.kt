@@ -157,30 +157,24 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         }
 
         get("/manga/chapter/pages") {
-            call.application.environment.log.info("Received request for pages")
-            Log.i(LOG_TAG, "Received request for pages")
-            try {
-                val chapterToFetch = call.receive<SChapterImpl>()
-                val sourceId = call.request.queryParameters["sourceId"]?.toLong()
+            val chapterToFetch = call.receive<SChapterImpl>()
+            val sourceId = call.request.queryParameters["sourceId"]?.toLong()
 
-                if (sourceId == null) {
-                    call.response.status(HttpStatusCode(400, "Missing sourceId"))
-                    return@get
-                }
-
-                val source = sourceManager.get(sourceId)
-                if (source == null) {
-                    call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
-                    return@get
-                }
-
-                val pageList = source.getPageList(chapterToFetch)
-
-                call.respond(pageList)
+            if (sourceId == null) {
+                call.response.status(HttpStatusCode(400, "Missing sourceId"))
                 return@get
-            } catch (e: Exception) {
-                Log.e(LOG_TAG, "$e: ${e.printStackTrace()}")
             }
+
+            val source = sourceManager.get(sourceId)
+            if (source == null) {
+                call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                return@get
+            }
+
+            val pageList = source.getPageList(chapterToFetch)
+
+            call.respond(pageList)
+            return@get
         }
 
         get("/manga/chapter/page/image") {

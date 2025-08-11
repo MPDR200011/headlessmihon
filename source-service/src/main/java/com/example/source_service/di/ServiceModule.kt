@@ -5,6 +5,7 @@ import android.content.Context
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.util.system.isDebugBuildType
+import kotlinx.serialization.json.Json
 import tachiyomi.core.common.preference.AndroidPreferenceStore
 import tachiyomi.core.common.preference.PreferenceStore
 import uy.kohesive.injekt.api.InjektModule
@@ -27,5 +28,12 @@ class ServiceModule(private val app: Application, private val context: Context) 
             )
         }
         addSingletonFactory { NetworkHelper(context, get()) }
+
+        addSingletonFactory {
+            Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+            }
+        }
     }
 }
