@@ -16,6 +16,7 @@ import com.google.gson.LongSerializationPolicy
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.AndroidSourceManager
+import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapterImpl
 import eu.kanade.tachiyomi.source.model.SManga
@@ -110,7 +111,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                             resultsMap.set(source.id, titles)
                         } catch (e: Exception) {
                             Log.e(
-                                "SOURCE_SERVICE",
+                                LOG_TAG,
                                 "Failed to query with error: ${e.message}\n${e.stackTraceToString()}",
                             )
                         }
@@ -118,6 +119,37 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 }.awaitAll()
 
                 call.respond(resultsMap.toMap())
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Failed to query with error: ${e.message}\\n${e.stackTraceToString()} ")
+            }
+        }
+
+        get("/search/{sourceId}") {
+            try {
+                val query = call.request.queryParameters["q"]
+                val language = call.request.queryParameters["l"] ?: "en"
+                if (query == null) {
+                    call.respond<Map<Long, List<Manga>>>(mapOf())
+                    return@get
+                }
+
+                val sourceId = call.parameters["sourceId"]?.toLong()
+                if (sourceId == null) {
+                    call.response.status(HttpStatusCode.BadRequest)
+                    return@get
+                }
+
+                val source = sourceManager.get(sourceId) as CatalogueSource?
+                if (source == null) {
+                    call.response.status(HttpStatusCode(404, "Source with id $sourceId not found"))
+                    return@get
+                }
+
+                val page = source.getSearchManga(1, query, source.getFilterList())
+                val titles = page.mangas
+                    .distinctBy { it.url }
+
+                call.respond(titles)
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "Failed to query with error: ${e.message}\\n${e.stackTraceToString()} ")
             }
