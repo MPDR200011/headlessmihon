@@ -1,6 +1,7 @@
 package com.example.source_service
 
 import android.app.Notification
+import tachiyomi.data.chapter.ChapterSanitizer
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -11,6 +12,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.example.source_service.di.ServiceModule
 import com.example.source_service.gson.PageAdapter
+import com.example.source_service.model.Chapter
 import com.google.errorprone.annotations.Immutable
 import com.google.gson.LongSerializationPolicy
 import eu.kanade.domain.source.service.SourcePreferences
@@ -47,6 +49,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.slf4j.event.Level
 import tachiyomi.core.common.preference.AndroidPreferenceStore
+import tachiyomi.domain.chapter.service.ChapterRecognition
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.domain.source.repository.StubSourceRepository
@@ -181,6 +184,7 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
         get("/manga/chapters") {
             val mangaToFetch = call.receive<SourceManga>()
             val sourceId = mangaToFetch.source
+            val manga = mangaToFetch.manga;
 
             val source = sourceManager.get(sourceId)
             if (source == null) {
@@ -188,9 +192,25 @@ fun Application.routing(sourceManager: AndroidSourceManager) {
                 return@get
             }
 
-            val chapterList = source.getChapterList(mangaToFetch.manga)
+            val sourceChapters = source.getChapterList(manga).mapIndexed { i, sChapter ->
+                Chapter.create()
+                    .copyFromSChapter(sChapter)
+                    .copy(name = with(ChapterSanitizer) {sChapter.name.sanitize(manga.title)})
+                    .copy(source_order = i.toLong())
+            }.map {
+                var chapter = it
+                if (source is HttpSource) {
+                    val sChapter = chapter.toSChapter()
+                    source.prepareNewChapter(sChapter, manga)
+                    chapter = chapter.copyFromSChapter(sChapter)
+                }
 
-            call.respond(chapterList)
+                chapter = chapter.copy(chapter_number = ChapterRecognition.parseChapterNumber(manga.title, chapter.name, chapter.chapter_number))
+
+                return@map chapter
+            }
+
+            call.respond(sourceChapters)
         }
 
         get("/manga/chapter/pages") {

@@ -64,9 +64,11 @@ dependencies {
 
     implementation(libs.injekt)
 
-    implementation(project(":app"))
-    implementation(project(":core:common"))
-    implementation(project(":domain"))
-    implementation(project(":source-api"))
+    implementation(projects.app)
+    implementation(projects.core.common)
+    implementation(projects.data)
+    implementation(projects.domain)
+    implementation(projects.sourceApi)
+
     testImplementation(kotlin("test"))
 }
