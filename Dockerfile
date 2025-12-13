@@ -61,12 +61,13 @@ RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}
 #################
 
 # Utils for the application
+RUN apt install -y simpleproxy
 RUN apt install -y python3 python3-pip
-RUN pip install requests simple-proxy
+RUN pip install requests
 
 ARG RUNTIME_ROOT="/run"
 ENV RUNTIME_ROOT=$RUNTIME_ROOT
-ARG UTILS_DIR="${RUNTIME_ROOT}/utils/"
+ARG UTILS_DIR="${RUNTIME_ROOT}/utils"
 
 #===================
 # Ports
