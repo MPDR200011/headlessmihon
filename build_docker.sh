@@ -6,4 +6,4 @@ set -e
 
 # TODO: sign the APK
 
-sudo docker buildx build -t service-runner .
+sudo docker buildx build -t mpdr/headlessmihon .
