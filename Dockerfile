@@ -1,4 +1,4 @@
-FROM openjdk:18-jdk-slim
+FROM eclipse-temurin:21-jdk
 
 LABEL maintainer="mpdr"
 
@@ -62,8 +62,7 @@ RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}
 
 # Utils for the application
 RUN apt install -y simpleproxy
-RUN apt install -y python3 python3-pip
-RUN pip install requests
+RUN apt install -y python3 python3-pip python3-requests
 
 ARG RUNTIME_ROOT="/run"
 ENV RUNTIME_ROOT=$RUNTIME_ROOT
