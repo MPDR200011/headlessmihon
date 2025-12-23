@@ -64,6 +64,10 @@ RUN echo "no" | avdmanager --verbose create avd --force --name "${EMULATOR_NAME}
 RUN apt install -y simpleproxy
 RUN apt install -y python3 python3-pip python3-requests
 
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+ENV PATH="/root/.local/bin/:$PATH"
+
 ARG RUNTIME_ROOT="/run"
 ENV RUNTIME_ROOT=$RUNTIME_ROOT
 ARG UTILS_DIR="${RUNTIME_ROOT}/utils"
@@ -71,7 +75,10 @@ ARG UTILS_DIR="${RUNTIME_ROOT}/utils"
 #===================
 # Ports
 #===================
+# Sources Service port
 EXPOSE 8081 8081/tcp
+# Control Service port
+EXPOSE 8090 8090/tcp
 
 #===================
 # Download extension APKs
@@ -79,6 +86,14 @@ EXPOSE 8081 8081/tcp
 COPY ./download_extensions.py $UTILS_DIR/download_extensions.py
 RUN chmod a+x $UTILS_DIR/download_extensions.py
 RUN $UTILS_DIR/download_extensions.py
+
+#===================
+# Setup control service code
+#===================
+ARG CTRL_SERVICE_PATH=$RUNTIME_ROOT/control-service
+COPY ./control-service $CTRL_SERVICE_PATH
+WORKDIR $CTRL_SERVICE_PATH
+RUN uv sync --frozen
 
 #=========================
 # Copy service APK

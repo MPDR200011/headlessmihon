@@ -1,0 +1,11 @@
+[project]
+name = "control-service"
+version = "0.1.0"
+description = "Control Service for the Sources Service"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bottle>=0.13.4",
+    "cheroot>=11.1.2",
+    "requests>=2.32.5",
+]

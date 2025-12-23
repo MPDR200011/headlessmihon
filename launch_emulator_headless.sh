@@ -112,7 +112,7 @@ function start_service() {
   # be transitive
   simpleproxy -R localhost:9000 -L 8081 -v &
 
-  adb logcat -s SOURCE_SERVICE:I
+  uv run main.py & adb logcat -s SOURCE_SERVICE:I
 }
 
 launch_emulator
