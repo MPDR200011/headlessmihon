@@ -99,9 +99,6 @@ function hidden_policy() {
 function install_service_apk () {
   adb shell "settings put secure install_non_market_apps 1"
   adb install $APK_LOCATION
-
-  echo "Installing extensions"
-  ls $RUNTIME_ROOT/extension_apks/ | xargs -n 1 -i -t adb install $RUNTIME_ROOT/extension_apks/{}
 }
 
 function start_service() {

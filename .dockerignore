@@ -1,3 +1,6 @@
 .dockerignore
 .editorconfig
 .git/**
+
+**.venv
+
