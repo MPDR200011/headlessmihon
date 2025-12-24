@@ -96,15 +96,7 @@ function hidden_policy() {
   adb shell "settings put global hidden_api_policy_pre_p_apps 1;settings put global hidden_api_policy_p_apps 1;settings put global hidden_api_policy 1"
 };
 
-function install_service_apk () {
-  adb shell "settings put secure install_non_market_apps 1"
-  adb install $APK_LOCATION
-}
-
 function start_service() {
-  adb forward tcp:9000 tcp:8080
-  adb shell am start-foreground-service com.example.source_service/.SourceService
-
   # This is needed as exposing the docker port + adb forward doesn't appear to
   # be transitive
   simpleproxy -R localhost:9000 -L 8081 -v &
@@ -121,5 +113,4 @@ sleep 1
 hidden_policy
 sleep 1
 
-install_service_apk
 start_service

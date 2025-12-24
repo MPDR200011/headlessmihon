@@ -58,6 +58,14 @@ def install_extensions():
 def main():
     logger.info("Starting up server")
 
+    subprocess.run(["adb", "shell", "settings put secure install_non_market_apps 1"])
+    res = install_apk(os.environ['APK_LOCATION'])
+    if (res.returncode != 0):
+        raise RuntimeError("Failed to install service APK")
+
+    subprocess.run(["adb", "forward", "tcp:9000", "tcp:8080"])
+    subprocess.run(["adb", "shell", "am", "start-foreground-service com.example.source_service/.SourceService"])
+
     os.makedirs(APK_DIR, exist_ok=True)
 
     logger.info("Getting needed extensions")
