@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 app = Bottle()
 
+def get_needed_extensions():
+    data_host = os.environ["LARAVEL_HOST"]
+    res = requests.get(f'{data_host}/extensions/needed')
+    print(res.content)
+    return res.json()
 
 def download_apk(apk_name: str) -> str:
     apk_request_url = f"https://github.com/keiyoushi/extensions/raw/refs/heads/repo/apk/{apk_name}"
@@ -29,6 +34,13 @@ def download_apk(apk_name: str) -> str:
 def install_apk(apk_file_path: str) -> subprocess.CompletedProcess:
     return subprocess.run(["adb", "install", apk_file_path])
 
+def download_and_install_apk(apk_name: str):
+    logger.info(f'Installing apk {apk_name}')
+    apk_location = download_apk(apk_name)
+    result = install_apk(apk_location)
+    os.remove(apk_location)
+    if result.returncode != 0:
+        logger.error('Installation failed')
 
 @app.route('/extensions/sync', method='POST')
 def install_extensions():
@@ -40,17 +52,18 @@ def install_extensions():
     for extension in extensions_to_download:
         apk_name = extension['apk']
         logger.info(f'Installing apk {apk_name}')
-        apk_location = download_apk(apk_name)
-        result = install_apk(apk_location)
-        os.remove(apk_location)
-        if result.returncode != 0:
-            logger.error('Installation failed')
+        download_and_install_apk(apk_name)
         logger.info(f'done')
 
 def main():
     logger.info("Starting up server")
 
     os.makedirs(APK_DIR, exist_ok=True)
+
+    logger.info("Getting needed extensions")
+    for extension in get_needed_extensions():
+        download_and_install_apk(extension['apk'])
+    logger.info("All needed extensions installed")
 
     app.run(host='0.0.0.0', port=8090, server='cheroot')
 
