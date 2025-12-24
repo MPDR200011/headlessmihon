@@ -81,13 +81,6 @@ EXPOSE 8081 8081/tcp
 EXPOSE 8090 8090/tcp
 
 #===================
-# Download extension APKs
-#===================
-COPY ./download_extensions.py $UTILS_DIR/download_extensions.py
-RUN chmod a+x $UTILS_DIR/download_extensions.py
-RUN $UTILS_DIR/download_extensions.py
-
-#===================
 # Setup control service code
 #===================
 ARG CTRL_SERVICE_PATH=$RUNTIME_ROOT/control-service

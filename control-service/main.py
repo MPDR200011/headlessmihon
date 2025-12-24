@@ -30,7 +30,7 @@ def install_apk(apk_file_path: str) -> subprocess.CompletedProcess:
     return subprocess.run(["adb", "install", apk_file_path])
 
 
-@app.route('/extensions/install', method='POST')
+@app.route('/extensions/sync', method='POST')
 def install_extensions():
     extensions_to_download = request.json
 
@@ -49,6 +49,8 @@ def install_extensions():
 
 def main():
     logger.info("Starting up server")
+
+    os.makedirs(APK_DIR, exist_ok=True)
 
     app.run(host='0.0.0.0', port=8090, server='cheroot')
 
