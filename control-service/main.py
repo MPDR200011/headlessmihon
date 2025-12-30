@@ -16,7 +16,6 @@ app = Bottle()
 def get_needed_extensions():
     data_host = os.environ["LARAVEL_HOST"]
     res = requests.get(f'{data_host}/extensions/needed')
-    print(res.content)
     return res.json()
 
 def download_apk(apk_name: str) -> str:
@@ -63,15 +62,15 @@ def main():
     if (res.returncode != 0):
         raise RuntimeError("Failed to install service APK")
 
-    subprocess.run(["adb", "forward", "tcp:9000", "tcp:8080"])
-    subprocess.run(["adb", "shell", "am", "start-foreground-service com.example.source_service/.SourceService"])
-
     os.makedirs(APK_DIR, exist_ok=True)
 
     logger.info("Getting needed extensions")
     for extension in get_needed_extensions():
         download_and_install_apk(extension['apk'])
     logger.info("All needed extensions installed")
+
+    subprocess.run(["adb", "forward", "tcp:9000", "tcp:8080"])
+    subprocess.run(["adb", "shell", "am", "start-foreground-service com.example.source_service/.SourceService"])
 
     app.run(host='0.0.0.0', port=8090, server='cheroot')
 

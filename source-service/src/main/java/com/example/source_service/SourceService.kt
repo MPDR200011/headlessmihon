@@ -318,6 +318,10 @@ class SourceService : Service() {
         return START_STICKY
     }
 
+    override fun onLowMemory() {
+        Log.i(LOG_TAG, "Low memory detected")
+    }
+
     override fun onDestroy() {
         Log.i(LOG_TAG, "Destroying")
         server.stop(0, 0)
